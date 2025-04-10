@@ -1,0 +1,68 @@
+apiVersion: "sparkoperator.k8s.io/v1beta2"
+kind: SparkApplication
+metadata:
+  # Name of the driver on k8s
+  name: list-my-friends-app
+  namespace: default
+  labels:
+    app: list-my-friends-app
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+
+  # Spark image
+  image: "sparkk8s"
+
+  mainApplicationFile: local:///opt/application/myfriends.py
+  sparkVersion: "3.5"
+  restartPolicy:
+    type: Never
+
+  sparkConf:
+    "spark.kubernetes.authenticate.driver.serviceAccountName": "spark"
+    "spark.ui.port": "4040"
+
+    "spark.driver.extraJavaOptions": "-Divy.cache.dir=/tmp/ivy-cache -Divy.home=/tmp/ivy-cache"
+    "spark.executor.extraJavaOptions": "-Divy.cache.dir=/tmp/ivy-cache -Divy.home=/tmp/ivy-cache"
+    "spark.jars.ivy": "/tmp/ivy"
+
+
+  timeToLiveSeconds: 300
+  deps: {}
+
+  driver:
+    cores: 1
+    memory: "1g"
+    labels:
+      version: "3.5"
+
+  executor:
+    cores: 1
+    memory: "1g"
+    instances: 1
+    labels:
+      version: "3.5"
+
+  dynamicAllocation:
+    enabled: true
+    initialExecutors: 1
+    minExecutors: 1
+    maxExecutors: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: sparkui-loadbalancer
+  name: sparkui-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    # The UI runs in the driver, so use that for the selector
+    spark-role: driver
+  ports:
+    - name: sparkui
+      protocol: TCP
+      port: 4040
+      targetPort: 4040
