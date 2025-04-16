@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.service: nessie
+  name: nessie
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.service: nessie
+  template:
+    metadata:
+      labels:
+        io.service: nessie
+    spec:
+      containers:
+        - env:
+            - name: nessie.catalog.default-warehouse
+              value: warehouse
+            - name: nessie.catalog.secrets.access-key.name
+              value: admin
+            - name: nessie.catalog.secrets.access-key.secret
+              value: password
+            - name: nessie.catalog.service.s3.default-options.path-style-access
+              value: "true"
+            - name: nessie.catalog.service.s3.default-options.access-key
+              value: urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key
+            - name: nessie.catalog.service.s3.default-options.endpoint
+              value: http://minio:9000/
+            - name: nessie.catalog.service.s3.default-options.region
+              value: us-east-1
+            - name: nessie.catalog.warehouses.warehouse.location
+              value: s3://warehouse/
+            - name: nessie.server.authentication.enabled
+              value: "false"
+            - name: nessie.version.store.type
+              value: IN_MEMORY
+          image: ghcr.io/projectnessie/nessie:0.99.0
+          name: nessie
+          ports:
+            - containerPort: 19120
+              protocol: TCP
+      restartPolicy: Always

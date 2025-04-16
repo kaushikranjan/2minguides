@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trino-config
+data:
+  config.properties: |
+    coordinator=true
+    node-scheduler.include-coordinator=true
+    http-server.http.port=8080
+    discovery-server.enabled=true
+    discovery.uri=http://localhost:8080
+
+  jvm.config: |
+    -server
+    -Xmx2G
+    -XX:+ExitOnOutOfMemoryError
+
+  node.properties: |
+    node.environment=production
+    node.id=trino-coordinator
+    node.data-dir=/data/trino
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trino-catalogs
+data:
+  iceberg.properties: |
+    connector.name=iceberg
+    iceberg.catalog.type=nessie
+    iceberg.nessie-catalog.uri=http://nessie:19120/api/v2
+    iceberg.nessie-catalog.ref=main
+    iceberg.nessie-catalog.default-warehouse-dir=s3://warehouse
+    iceberg.file-format=PARQUET
+
+    fs.native-s3.enabled=true
+    s3.aws-access-key=admin
+    s3.aws-secret-key=password
+    s3.endpoint=http://minio:9000
+    s3.path-style-access=true
+    s3.region=us-east-1
