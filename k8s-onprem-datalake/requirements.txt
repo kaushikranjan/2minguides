@@ -1,0 +1,6 @@
+py4j==0.10.9.7
+pyspark
+typeid-python
+uuid6
+kafka-python
+faker

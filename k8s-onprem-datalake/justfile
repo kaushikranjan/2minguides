@@ -1,0 +1,4 @@
+image_name := 'birthday-spark-image'
+
+update:
+    docker build -t {{image_name}} .
