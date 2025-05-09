@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trino
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: trino
+  template:
+    metadata:
+      labels:
+        name: trino
+    spec:
+      containers:
+        - name: trino
+          image: trinodb/trino:474
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: trino-config
+              mountPath: /etc/trino
+            - name: trino-catalogs
+              mountPath: /etc/trino/catalog
+      volumes:
+        - name: trino-config
+          configMap:
+            name: trino-config
+        - name: trino-catalogs
+          configMap:
+            name: trino-catalogs
+      restartPolicy: Always

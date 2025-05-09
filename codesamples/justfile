@@ -1,0 +1,4 @@
+image_name := 'sparkk8s-codesamples'
+
+update:
+    docker build -t {{image_name}} .

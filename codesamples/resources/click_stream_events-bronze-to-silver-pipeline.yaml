@@ -1,0 +1,85 @@
+apiVersion: "sparkoperator.k8s.io/v1beta2"
+kind: SparkApplication
+metadata:
+  name: bronzetosilver
+  namespace: default
+  labels:
+    app: bronzetosilver
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: "sparkk8s-codesamples"
+  mainApplicationFile: local:///opt/application/StreamingBronzeToSilver.py
+  sparkVersion: "3.5"
+  arguments: ["--intervalseconds=10", "--namespace=bronze", "--table=click_stream_events", "--objectstore=s3a://warehouse/"]
+  restartPolicy:
+    type: Never
+
+  sparkConf:
+    "spark.kubernetes.authenticate.driver.serviceAccountName": "spark"
+    "spark.ui.port": "4040"
+
+    "spark.driver.extraJavaOptions": "-Divy.cache.dir=/tmp/ivy-cache -Divy.home=/tmp/ivy-cache"
+    "spark.executor.extraJavaOptions": "-Divy.cache.dir=/tmp/ivy-cache -Divy.home=/tmp/ivy-cache"
+    "spark.jars.ivy": "/tmp/ivy"
+
+
+    "spark.jars.packages": "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_2.12:0.103.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.8.0,org.apache.iceberg:iceberg-aws-bundle:1.8.0,org.apache.hadoop:hadoop-aws:3.3.4"
+
+    "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions"
+    "spark.sql.catalog.nessie": "org.apache.iceberg.spark.SparkCatalog"
+    "spark.sql.catalog.nessie.uri": "http://nessie:19120/api/v2"
+    "spark.sql.catalog.nessie.warehouse": "s3://warehouse/"
+    "spark.sql.catalog.nessie.catalog-impl": "org.apache.iceberg.nessie.NessieCatalog"
+    "spark.sql.catalog.nessie.io-impl": "org.apache.iceberg.aws.s3.S3FileIO"
+    "spark.sql.catalog.nessie.ref": "main"
+    "spark.sql.catalog.nessie.cache-enabled": "false"
+    "spark.sql.catalog.nessie.s3.endpoint": "http://minio:9000"
+    "spark.sql.catalog.nessie.authentication.type": "NONE"
+    "spark.sql.catalog.nessie.s3.path-style-access": "true"
+    "spark.hadoop.fs.s3a.access.key": "admin"
+    "spark.hadoop.fs.s3a.secret.key": "password"
+    "spark.hadoop.fs.s3a.path.style.access": "true"
+    "spark.hadoop.fs.s3a.endpoint": "http://minio:9000"
+
+
+  timeToLiveSeconds: 300
+  deps: {}
+
+  driver:
+    memory: "1g"
+    env:
+      - name: AWS_DEFAULT_REGION
+        value: "us-east-1"
+      - name: AWS_REGION
+        value: "us-east-1"
+      - name: AWS_ACCESS_KEY_ID
+        value: "admin"
+      - name: AWS_SECRET_ACCESS_KEY
+        value: "password"
+      - name: AWS_JAVA_V1_DISABLE_DEPRECATION_ANNOUNCEMENT
+        value: "true"
+
+
+  executor:
+    instances: 1
+    memory: "1g"
+    env:
+      - name: AWS_DEFAULT_REGION
+        value: "us-east-1"
+      - name: AWS_REGION
+        value: "us-east-1"
+      - name: AWS_ACCESS_KEY_ID
+        value: "admin"
+      - name: AWS_SECRET_ACCESS_KEY
+        value: "password"
+      - name: AWS_JAVA_V1_DISABLE_DEPRECATION_ANNOUNCEMENT
+        value: "true"
+
+
+  dynamicAllocation:
+    enabled: true
+    initialExecutors: 1
+    minExecutors: 1
+    maxExecutors: 1
