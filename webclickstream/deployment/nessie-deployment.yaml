@@ -1,0 +1,58 @@
+# Nessie Deployment Configuration
+# This file defines a Kubernetes deployment for Project Nessie, a transactional catalog for data lakes
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.service: nessie  # Service label for identifying Nessie pods
+  name: nessie
+spec:
+  replicas: 1  # Number of Nessie server instances to run
+  selector:
+    matchLabels:
+      io.service: nessie  # Label selector for pod management
+  template:
+    metadata:
+      labels:
+        io.service: nessie  # Labels applied to the pod
+    spec:
+      containers:
+        - env:
+            # Basic Nessie configuration
+            - name: nessie.catalog.default-warehouse
+              value: warehouse  # Default warehouse name for Nessie catalog
+            
+            # Authentication configuration
+            - name: nessie.catalog.secrets.access-key.name
+              value: admin  # Username for authentication
+            - name: nessie.catalog.secrets.access-key.secret
+              value: password  # Password for authentication
+            
+            # S3 storage configuration
+            - name: nessie.catalog.service.s3.default-options.path-style-access
+              value: "true"  # Enable path-style access for S3
+            - name: nessie.catalog.service.s3.default-options.access-key
+              value: urn:nessie-secret:quarkus:nessie.catalog.secrets.access-key  # Reference to access key secret
+            - name: nessie.catalog.service.s3.default-options.endpoint
+              value: http://minio:9000/  # MinIO S3-compatible storage endpoint
+            - name: nessie.catalog.service.s3.default-options.region
+              value: us-east-1  # S3 region configuration
+            
+            # Warehouse configuration
+            - name: nessie.catalog.warehouses.warehouse.location
+              value: s3://warehouse/  # S3 location for the warehouse
+            
+            # Server configuration
+            - name: nessie.server.authentication.enabled
+              value: "false"  # Disable authentication for development
+            - name: nessie.version.store.type
+              value: IN_MEMORY  # Use in-memory version store
+            
+          # Container configuration
+          image: ghcr.io/projectnessie/nessie:0.99.0  # Nessie server image and version
+          name: nessie
+          ports:
+            - containerPort: 19120  # Default Nessie API port
+              protocol: TCP
+      restartPolicy: Always  # Always restart the container if it fails

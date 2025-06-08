@@ -1,0 +1,41 @@
+# Trino Deployment Configuration
+# This deployment sets up a Trino coordinator node for SQL query processing
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trino
+spec:
+  # Run a single replica of Trino coordinator
+  replicas: 1
+  selector:
+    matchLabels:
+      name: trino
+  template:
+    metadata:
+      labels:
+        name: trino
+    spec:
+      containers:
+        - name: trino
+          # Use official Trino image with specific version
+          image: trinodb/trino:474
+          ports:
+            # Trino HTTP server port for client connections
+            - containerPort: 8080
+          volumeMounts:
+            # Mount configuration files from ConfigMaps
+            - name: trino-config
+              mountPath: /etc/trino
+            - name: trino-catalogs
+              mountPath: /etc/trino/catalog
+      volumes:
+        # Volume for core Trino configuration
+        - name: trino-config
+          configMap:
+            name: trino-config
+        # Volume for catalog configurations (e.g., Iceberg)
+        - name: trino-catalogs
+          configMap:
+            name: trino-catalogs
+      # Ensure container restarts if it fails
+      restartPolicy: Always

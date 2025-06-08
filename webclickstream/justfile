@@ -1,0 +1,4 @@
+image_name := 'webclickstream-events'
+
+update:
+    docker build -t {{image_name}} .
