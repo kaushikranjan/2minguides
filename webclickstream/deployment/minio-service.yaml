@@ -1,0 +1,22 @@
+# MinIO Service Configuration
+# This service exposes MinIO API and Console ports to make them accessible within the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  # Labels for service identification and selection
+  labels:
+    io.service: minio
+  name: minio
+spec:
+  ports:
+    # Port 9000: MinIO API endpoint for S3-compatible object storage operations
+    - name: "9000"
+      port: 9000
+      targetPort: 9000
+    # Port 9001: MinIO Console for web-based management interface
+    - name: "9001"
+      port: 9001
+      targetPort: 9001
+  # Selector to match pods with the same label for service routing
+  selector:
+    io.service: minio
