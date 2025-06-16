@@ -1,0 +1,98 @@
+# Spark application configuration for bronze to silver data pipeline
+apiVersion: "sparkoperator.k8s.io/v1beta2"  # API version for Spark operator
+kind: SparkApplication  # Resource type for Spark application
+metadata:
+  name: gold-fact-productmetrics-pageview  # Name of the Spark application
+  namespace: default  # Kubernetes namespace
+  labels:
+    app: gold-fact-productmetrics-pageview  # Application label for identification
+spec:
+  type: Python  # Application type (Python)
+  pythonVersion: "3"  # Python version
+  mode: cluster  # Execution mode (cluster)
+  image: "webclickstream-events"  # Docker image name
+  mainApplicationFile: local:///opt/application/Facts.py  # Main Python script path
+  sparkVersion: "3.5"  # Apache Spark version
+  arguments: ["--facts_type=page_views"]  # Command line arguments
+  restartPolicy:
+    type: Never  # Never restart on failure
+
+  sparkConf:
+    # Service account configuration for Kubernetes authentication
+    "spark.kubernetes.authenticate.driver.serviceAccountName": "spark"
+    "spark.ui.port": "4040"  # Spark UI port
+
+    # Java options for driver and executor
+    "spark.driver.extraJavaOptions": "-Divy.cache.dir=/tmp/ivy-cache -Divy.home=/tmp/ivy-cache"
+    "spark.executor.extraJavaOptions": "-Divy.cache.dir=/tmp/ivy-cache -Divy.home=/tmp/ivy-cache"
+    "spark.jars.ivy": "/tmp/ivy"
+
+    # Required Spark packages for Nessie and Iceberg integration
+    "spark.jars.packages": "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.5_2.12:0.103.0,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.8.0,org.apache.iceberg:iceberg-aws-bundle:1.8.0,org.apache.hadoop:hadoop-aws:3.3.4"
+
+    # Spark SQL extensions for Iceberg and Nessie
+    "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions"
+    
+    # Nessie catalog configuration
+    "spark.sql.catalog.nessie": "org.apache.iceberg.spark.SparkCatalog"
+    "spark.sql.catalog.nessie.uri": "http://nessie:19120/api/v2"  # Nessie API endpoint
+    "spark.sql.catalog.nessie.warehouse": "s3://warehouse/"  # S3 warehouse location
+    "spark.sql.catalog.nessie.catalog-impl": "org.apache.iceberg.nessie.NessieCatalog"
+    "spark.sql.catalog.nessie.io-impl": "org.apache.iceberg.aws.s3.S3FileIO"
+    "spark.sql.catalog.nessie.ref": "main"  # Nessie reference branch
+    "spark.sql.catalog.nessie.cache-enabled": "false"  # Disable catalog caching
+    
+    # S3/MinIO configuration
+    "spark.sql.catalog.nessie.s3.endpoint": "http://minio:9000"  # MinIO endpoint
+    "spark.sql.catalog.nessie.authentication.type": "NONE"  # No authentication
+    "spark.sql.catalog.nessie.s3.path-style-access": "true"  # Use path-style access
+    "spark.hadoop.fs.s3a.access.key": "admin"  # S3 access key
+    "spark.hadoop.fs.s3a.secret.key": "password"  # S3 secret key
+    "spark.hadoop.fs.s3a.path.style.access": "true"  # Use path-style access
+    "spark.hadoop.fs.s3a.endpoint": "http://minio:9000"  # MinIO endpoint
+
+  timeToLiveSeconds: 300  # Application TTL
+  deps: {}  # Dependencies
+
+  # Driver configuration
+  driver:
+    memory: "1g"
+    env:
+      - name: AWS_DEFAULT_REGION
+        value: "us-east-1"
+      - name: AWS_REGION
+        value: "us-east-1"
+      - name: AWS_ACCESS_KEY_ID
+        value: "admin"
+      - name: AWS_SECRET_ACCESS_KEY
+        value: "password"
+      - name: AWS_JAVA_V1_DISABLE_DEPRECATION_ANNOUNCEMENT
+        value: "true"
+      - name: WAREHOUSE
+        value: "s3a://warehouse"
+
+  # Executor configuration
+  executor:
+    instances: 1
+    memory: "1g"
+    env:
+      - name: AWS_DEFAULT_REGION
+        value: "us-east-1"
+      - name: AWS_REGION
+        value: "us-east-1"
+      - name: AWS_ACCESS_KEY_ID
+        value: "admin"
+      - name: AWS_SECRET_ACCESS_KEY
+        value: "password"
+      - name: AWS_JAVA_V1_DISABLE_DEPRECATION_ANNOUNCEMENT
+        value: "true"
+      - name: WAREHOUSE
+        value: "s3a://warehouse"
+
+  # Dynamic allocation configuration
+  dynamicAllocation:
+    enabled: true
+    initialExecutors: 1
+    minExecutors: 1
+    maxExecutors: 1
+  
