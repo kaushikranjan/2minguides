@@ -47,7 +47,7 @@ class SilverSetup:
                             user_gender STRING
                         )
                         USING ICEBERG
-                        PARTITIONED BY (bucket(3, product_segment), bucket(3, product_id))
+                        PARTITIONED BY (product_segment, product_id)
                        """)
         
         # Create the click_events table
@@ -85,5 +85,5 @@ class SilverSetup:
                             element_tag STRING
                         )
                         USING ICEBERG
-                        PARTITIONED BY (bucket(3, product_segment), bucket(3, product_id), bucket(3, element_id))
+                        PARTITIONED BY (product_segment, product_id, element_id))
                        """)

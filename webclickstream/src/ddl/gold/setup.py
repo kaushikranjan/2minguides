@@ -22,7 +22,7 @@ class GoldSetup:
                             click STRUCT<element_id: STRING, element_text: STRING>
                         )
                         USING ICEBERG
-                        PARTITIONED BY (minute_ts, bucket(3, product_segment), bucket(3, product_id), count_type)
+                        PARTITIONED BY (product_segment, product_id, count_type, minute_ts)
                        """)
         self.spark.sql(f"""
                         ALTER TABLE nessie.gold.fact_product_metrics 

@@ -13,10 +13,11 @@ class ProductFacts:
 
         # Define a function to handle each batch of data
         def _upsert(input_df: DataFrame, _batch_id: int):
-
-            input_df = input_df.withColumn("minute_ts", date_trunc("minute", "created_ts"))
-            input_df.createOrReplaceTempView("page_views_input")
-            input_df = input_df.sparkSession.sql("""
+            
+            input_df.persist()
+            modified_df = input_df.withColumn("minute_ts", date_trunc("minute", "created_ts"))
+            modified_df.createOrReplaceTempView("page_views_input")
+            grouped_df = modified_df.sparkSession.sql("""
                 SELECT 
                     minute_ts, product_id, product_name, product_segment,
                     COUNT(*) as counts, 'views' as count_type,
@@ -28,7 +29,55 @@ class ProductFacts:
                     product_name,
                     product_id
             """)
-            input_df.writeTo("nessie.gold.fact_product_metrics").append()
+
+            def compact(input_df: DataFrame):
+                unique_keys_df = input_df.select(
+                    "minute_ts", "product_segment", "product_name", "product_id"
+                ).distinct()
+
+                # Collect combinations (assumes limited number per micro-batch)
+                unique_keys = unique_keys_df.collect()
+                print("rahul-keys", unique_keys)
+
+                for row in unique_keys:
+                    minute_ts = row["minute_ts"]
+                    product_segment = row["product_segment"]
+                    product_id = row["product_id"]
+                    
+
+                    # Build WHERE clause for targeted compaction
+                    where_clause = (
+                        f"minute_ts = TIMESTAMP '{minute_ts}' AND "
+                        f"product_segment = '{product_segment}' AND "
+                        f"product_id = '{product_id}' AND "
+                        f"count_type = 'views'"
+                    )
+
+                    print(f"Compacting partition: {where_clause}")
+
+                    minFileSizeBytes = 384 * 1024 * 1024 # 384 MB i.e 0.75 of 512 MB
+                    maxFileSizeBytes = 896 * 1024 * 1024  # 896 MB i.e. 1.75 of 512MB
+                    targetFileSizeBytes = 512 * 1024 * 1024 # 512 MB
+                    minInputFiles = 1
+                    # Run compaction for the partition
+                    input_df.sparkSession.sql(f"""
+                        CALL nessie.system.rewrite_data_files(
+                            table => 'nessie.gold.fact_product_metrics',
+                            where => "{where_clause}",
+                            options => map(
+                                'min-file-size-bytes', '{minFileSizeBytes}',
+                                'max-file-size-bytes', '{maxFileSizeBytes}',
+                                'target-file-size-bytes', '{targetFileSizeBytes}',
+                                'min-input-files', '{minInputFiles}',
+                                'use-starting-sequence-number', 'false'
+                            )
+                        )
+                    """)
+            
+            compact(grouped_df)
+
+            grouped_df.writeTo("nessie.gold.fact_product_metrics").append()
+            input_df.unpersist()
 
            
         # Create a streaming DataFrame from the bronze layer page_views table
@@ -50,9 +99,11 @@ class ProductFacts:
         # Define a function to handle each batch of data
         def _upsert(input_df: DataFrame, _batch_id: int):
 
-            input_df = input_df.withColumn("minute_ts", date_trunc("minute", "created_ts"))
-            input_df.createOrReplaceTempView("click_events_input")
-            input_df = input_df.sparkSession.sql("""
+            input_df.persist()
+
+            modified_df = input_df.withColumn("minute_ts", date_trunc("minute", "created_ts"))
+            modified_df.createOrReplaceTempView("click_events_input")
+            grouped_df = modified_df.sparkSession.sql("""
                 SELECT 
                     minute_ts, product_id, product_name, product_segment,
                     COUNT(*) as counts, 'clicks' as count_type,
@@ -66,7 +117,57 @@ class ProductFacts:
                     element_id,
                     element_text
             """)
-            input_df.writeTo("nessie.gold.fact_product_metrics").append()
+
+            def compact(input_df: DataFrame):
+                unique_keys_df = input_df.select(
+                    "minute_ts", "product_segment", "product_name", "product_id"
+                ).distinct()
+
+                # Collect combinations (assumes limited number per micro-batch)
+                unique_keys = unique_keys_df.collect()
+                print("rahul-keys", unique_keys)
+
+                for row in unique_keys:
+                    minute_ts = row["minute_ts"]
+                    product_segment = row["product_segment"]
+                    product_name = row["product_name"]
+                    product_id = row["product_id"]
+                    
+                    # Build WHERE clause for targeted compaction
+                    where_clause = (
+                        f"minute_ts = TIMESTAMP '{minute_ts}' AND "
+                        f"product_segment = '{product_segment}' AND "
+                        f"product_id = '{product_id}' AND "
+                        f"count_type = 'clicks'"
+                    )
+                    print("rahul-values", where_clause)
+
+                    print(f"Compacting partition: {where_clause}")
+                    minFileSizeBytes = 384 * 1024 * 1024 # 384 MB i.e 0.75 of 512 MB
+                    maxFileSizeBytes = 896 * 1024 * 1024  # 896 MB i.e. 1.75 of 512MB
+                    targetFileSizeBytes = 512 * 1024 * 1024 # 512 MB
+                    minInputFiles = 1
+                    # Run compaction for the partition
+                    input_df.sparkSession.sql(f"""
+                        CALL nessie.system.rewrite_data_files(
+                            table => 'nessie.gold.fact_product_metrics',
+                            where => "{where_clause}",
+                            options => map(
+                                'min-file-size-bytes', '{minFileSizeBytes}',
+                                'max-file-size-bytes', '{maxFileSizeBytes}',
+                                'target-file-size-bytes', '{targetFileSizeBytes}',
+                                'min-input-files', '{minInputFiles}',
+                                'use-starting-sequence-number', 'false'
+                            )
+                        )
+                    """)
+            
+            grouped_df.writeTo("nessie.gold.fact_product_metrics").append()
+            compact(grouped_df)
+            
+            input_df.unpersist()
+
+            
 
            
         # Create a streaming DataFrame from the bronze layer page_views table
@@ -78,7 +179,7 @@ class ProductFacts:
         stream = clickevents_df.writeStream \
             .foreachBatch(_upsert) \
             .trigger(processingTime='1 seconds') \
-            .option("checkpointLocation", f"{self.checkpointBase}/checkpoint/gold_fact_product_metrics_click_events") \
+            .option("checkpointLocation", f"{self.checkpointBase}/checkpoint/gold_fact_product_metrics_clicks") \
             .start()
         
         stream.awaitTermination()
